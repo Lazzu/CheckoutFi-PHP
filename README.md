@@ -23,4 +23,5 @@ Changelog
 ---------
 
 2013-10-08 - 0.1.1 - Added `CheckoutReturnData->IsDelayed()` and fetching buttons throws an exception if curl POST request fails.
+
 2013-10-07 - 0.1.0 - First version
