@@ -1,11 +1,11 @@
 <?php
 
 /*
- * Checkout.fi PHP Interface for API V1.7
+ * PHP Interface for Checkout.fi API V1.7
  *
  * Based on http://checkout.fi/uploads/sopimukset/Checkout_1_4_rajapinta_api-v1.7.pdf
  *
- * Version 0.1.0
+ * Version 0.1.1
  *
  * Created by Lasse Numminen
  * http://lasse.pw/
@@ -95,8 +95,6 @@ class CheckoutPostData extends CheckoutDataObject
 	public $email			= "";
 	public $phone			= "";
 	public $mac				= "";
-
-	protected $validNames = array();
 
 	// Constructor for easy object generation
 	public function __construct($merchant, $password)
@@ -188,8 +186,6 @@ class CheckoutReturnData extends CheckoutDataObject
 	public $algorithm		= 0;
 	public $mac				= "";
 
-	protected $validNames = array();
-
 	// The API doc reference says these are the valid indicators for successful payment
 	protected $validPaidStatusNumbers = array(2, 4, 5, 6, 7, 8, 9, 10);
 
@@ -223,6 +219,11 @@ class CheckoutReturnData extends CheckoutDataObject
 	public function IsPaid()
 	{
 		return in_array($this->status, $this->validPaidStatusNumbers);
+	}
+
+	public function IsDelayed()
+	{
+		return $this->status == 3;
 	}
 }
 
@@ -259,21 +260,19 @@ class Checkout
 		return isset($_GET['MAC']);
 	}
 
-	/*
-	 * returns payment information in XML
-	 */
+	// Get the payment buttons
 	public function GetCheckoutBankButtons(CheckoutPostData $data) 
 	{
 		$data->device = "10"; // Set device to accept XML
 
-		// Get the xml data and convert to object
+		// Get the xml button data and convert to object
 		$xml = simplexml_load_string($this->SendCheckoutPostData($data));
 
 		// Check if succeeded
 		if($xml === false)
 			throw new CheckoutException("Checkout.fi buttons fetch failed. XML Not valid.");
 
-		// Save the payment URL
+		// Save the payment URL for possible future use
 		$this->PaymentURL = $xml->paymentURL;
 
 		// Return the button data
@@ -290,6 +289,7 @@ class Checkout
 				CURLOPT_URL 		=> 'https://payment.checkout.fi',
 				CURLOPT_FRESH_CONNECT 	=> 1,
 				CURLOPT_RETURNTRANSFER 	=> 1,
+				CURLOPT_FAILONERROR		=> 1,	// Make errors work better
 				CURLOPT_FORBID_REUSE 	=> 1,
 				CURLOPT_TIMEOUT 	=> 20,
 				CURLOPT_POSTFIELDS 	=> http_build_query($post)
@@ -298,6 +298,10 @@ class Checkout
 		$ch = curl_init();
 		curl_setopt_array($ch, $options);
 		$result = curl_exec($ch);
+	    
+	    if($result === false)
+	    	throw new CheckoutException("Curl POST request failed. Curl error: " . curl_error($ch));
+
 	    curl_close($ch);
 
 	    return $result; 
